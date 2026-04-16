@@ -3,8 +3,9 @@ import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
+import { initDB } from '../src/services/TranscriptStore';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -15,6 +16,7 @@ export const unstable_settings = {
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  const [dbReady, setDbReady] = useState(false);
   const [loaded, error] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
     ...FontAwesome.font,
@@ -25,12 +27,16 @@ export default function RootLayout() {
   }, [error]);
 
   useEffect(() => {
-    if (loaded) {
+    initDB().then(() => setDbReady(true));
+  }, []);
+
+  useEffect(() => {
+    if (loaded && dbReady) {
       SplashScreen.hideAsync();
     }
-  }, [loaded]);
+  }, [loaded, dbReady]);
 
-  if (!loaded) {
+  if (!loaded || !dbReady) {
     return null;
   }
 
@@ -38,7 +44,15 @@ export default function RootLayout() {
     <ThemeProvider value={DarkTheme}>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="meeting/[id]" options={{ presentation: 'modal', title: 'Meeting Details' }} />
+        <Stack.Screen
+          name="meeting/[id]"
+          options={{
+            presentation: 'modal',
+            title: 'Meeting Details',
+            headerStyle: { backgroundColor: '#121212' },
+            headerTintColor: '#fff',
+          }}
+        />
       </Stack>
     </ThemeProvider>
   );

@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Animated,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { AnswerSuggestion } from '../types';
 
 interface Props {
@@ -19,6 +20,8 @@ export function AnswerCard({ answer, fontSize, onDismiss }: Props) {
   const slideAnim = useRef(new Animated.Value(30)).current;
 
   useEffect(() => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
