@@ -19,7 +19,17 @@ export class AIProviderService {
     recentTranscript: string,
     lastSegment: string
   ): Promise<boolean> {
-    const prompt = `You are analyzing a meeting transcript. Is the following statement a question directed at someone in the meeting? Answer ONLY "YES" or "NO".
+    const prompt = `You are analyzing a meeting/interview transcript. Determine if the last statement requires the user to respond. Answer ONLY "YES" or "NO".
+
+Say YES for ANY of these:
+- Direct questions ("What do you think?", "How would you handle this?")
+- Indirect questions ("Tell me about...", "Walk me through...")
+- Invitations to speak ("If you want to add anything...", "Go ahead", "Anything else?", "Feel free to elaborate")
+- Open-ended prompts ("Let's hear your thoughts", "Over to you")
+- Requests for opinion or input ("I'd love your perspective", "What's your take?")
+- Prompts expecting a response even without a question mark
+
+Say NO only if the speaker is clearly making a statement that does NOT expect a response.
 
 Recent context:
 ${recentTranscript}
