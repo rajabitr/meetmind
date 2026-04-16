@@ -183,16 +183,19 @@ export function useTranscription(settings: AppSettings, apiKeys: Record<string, 
     await Store.addSegment(meetingId, segment);
 
     // Detect question and stream answer
+    setStatus(`Checking for question... (autoAnswer=${settings.autoAnswer}, ai=${!!aiRef.current})`);
     if (settings.autoAnswer && aiRef.current) {
       const recentText = segmentsRef.current
         .slice(-5)
         .map(s => s.speaker ? `${s.speaker}: ${s.text}` : s.text)
         .join(' ');
 
-      const isQuestion = await aiRef.current.detectQuestion(
-        recentText,
-        displayText
-      );
+      try {
+        const isQuestion = await aiRef.current.detectQuestion(
+          recentText,
+          displayText
+        );
+        setStatus(`Question detected: ${isQuestion ? 'YES' : 'NO'} — "${displayText.slice(0, 40)}"`);
 
       if (isQuestion) {
         segment.isQuestion = true;
@@ -222,6 +225,11 @@ export function useTranscription(settings: AppSettings, apiKeys: Record<string, 
           }
         );
       }
+      } catch (err: any) {
+        setStatus(`Question detection error: ${err?.message || err}`);
+      }
+    } else {
+      setStatus(`Skipping question detect: autoAnswer=${settings.autoAnswer}, ai=${!!aiRef.current}`);
     }
   };
 
