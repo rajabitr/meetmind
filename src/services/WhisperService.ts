@@ -1,4 +1,3 @@
-import * as FileSystem from 'expo-file-system';
 import { WHISPER_API_URL } from '../config/constants';
 
 interface WhisperResponse {
@@ -17,9 +16,6 @@ export class WhisperService {
     audioUri: string,
     language?: string
   ): Promise<WhisperResponse> {
-    const fileInfo = await FileSystem.getInfoAsync(audioUri);
-    if (!fileInfo.exists) throw new Error('Audio file not found');
-
     const formData = new FormData();
 
     formData.append('file', {

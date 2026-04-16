@@ -1,4 +1,3 @@
-import * as FileSystem from 'expo-file-system';
 import { DEEPGRAM_API_URL } from '../config/constants';
 
 interface DiarizedWord {
@@ -31,19 +30,6 @@ export class DeepgramService {
     audioUri: string,
     language?: string
   ): Promise<DeepgramResponse> {
-    const fileInfo = await FileSystem.getInfoAsync(audioUri);
-    if (!fileInfo.exists) throw new Error('Audio file not found');
-
-    // Read file as base64
-    const base64 = await FileSystem.readAsStringAsync(audioUri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-    const binaryString = atob(base64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-
     // Build query params
     const params = new URLSearchParams({
       model: 'nova-3',
@@ -58,13 +44,20 @@ export class DeepgramService {
       params.set('detect_language', 'true');
     }
 
+    // Use FormData approach (compatible with Expo Go)
+    const formData = new FormData();
+    formData.append('file', {
+      uri: audioUri,
+      type: 'audio/m4a',
+      name: 'audio.m4a',
+    } as any);
+
     const response = await fetch(`${DEEPGRAM_API_URL}?${params}`, {
       method: 'POST',
       headers: {
         Authorization: `Token ${this.apiKey}`,
-        'Content-Type': 'audio/m4a',
       },
-      body: bytes.buffer,
+      body: formData,
     });
 
     if (!response.ok) {
@@ -80,7 +73,7 @@ export class DeepgramService {
       return { segments: [], fullText: '', language: undefined };
     }
 
-    const detectedLang = channel?.detected_language || data.results?.channels?.[0]?.detected_language;
+    const detectedLang = channel?.detected_language;
 
     // Group words by speaker
     const words: DiarizedWord[] = (alternative.words || []).map((w: any) => ({
@@ -111,7 +104,6 @@ export class DeepgramService {
 
     for (const word of words) {
       if (word.speaker !== currentSpeaker) {
-        // Speaker changed — flush current segment
         segments.push({
           text: currentWords.join(' '),
           speaker: `Speaker ${currentSpeaker + 1}`,
@@ -122,7 +114,6 @@ export class DeepgramService {
       currentWords.push(word.word);
     }
 
-    // Flush last segment
     if (currentWords.length > 0) {
       segments.push({
         text: currentWords.join(' '),
