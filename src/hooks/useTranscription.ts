@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { AudioCaptureService } from '../services/AudioCaptureService';
 import { WhisperService } from '../services/WhisperService';
+import { DeepgramService } from '../services/DeepgramService';
 import { AIProviderService } from '../services/AIProviderService';
 import * as Store from '../services/TranscriptStore';
 import { TranscriptSegment, AnswerSuggestion, AppSettings } from '../types';
@@ -15,17 +16,35 @@ export function useTranscription(settings: AppSettings, apiKeys: Record<string, 
 
   const audioService = useRef(new AudioCaptureService());
   const whisperRef = useRef<WhisperService | null>(null);
+  const deepgramRef = useRef<DeepgramService | null>(null);
   const aiRef = useRef<AIProviderService | null>(null);
   const segmentsRef = useRef<TranscriptSegment[]>([]);
   const meetingIdRef = useRef<string | null>(null);
 
+  const resolveSpeakerName = (speaker: string): string => {
+    return settings.speakerNames?.[speaker] || speaker;
+  };
+
   const startSession = useCallback(async () => {
     setError(null);
 
-    const openaiKey = apiKeys['openai'];
-    if (!openaiKey) {
-      setError('OpenAI API key is required for Whisper transcription');
-      return;
+    const useDeepgram = settings.sttProvider === 'deepgram';
+
+    // Validate API keys
+    if (useDeepgram) {
+      const dgKey = apiKeys['deepgram'];
+      if (!dgKey) {
+        setError('Deepgram API key is required for speaker diarization');
+        return;
+      }
+      deepgramRef.current = new DeepgramService(dgKey);
+    } else {
+      const openaiKey = apiKeys['openai'];
+      if (!openaiKey) {
+        setError('OpenAI API key is required for Whisper transcription');
+        return;
+      }
+      whisperRef.current = new WhisperService(openaiKey);
     }
 
     const providerKey = apiKeys[settings.aiProvider];
@@ -33,8 +52,6 @@ export function useTranscription(settings: AppSettings, apiKeys: Record<string, 
       setError(`${settings.aiProvider} API key is required for AI features`);
       return;
     }
-
-    whisperRef.current = new WhisperService(openaiKey);
 
     if (providerKey) {
       aiRef.current = new AIProviderService({
@@ -68,89 +85,137 @@ export function useTranscription(settings: AppSettings, apiKeys: Record<string, 
 
     await audioService.current.startCapture(async (uri) => {
       try {
-        // 1. Transcribe audio chunk
-        const result = await whisperRef.current!.transcribe(
-          uri,
-          settings.sourceLanguage
-        );
-
-        if (!result.text || result.text.trim().length === 0) return;
-
-        // 2. Translate if needed
-        let displayText = result.text;
-        if (
-          settings.targetLanguage !== 'auto' &&
-          result.language &&
-          result.language !== settings.targetLanguage &&
-          aiRef.current
-        ) {
-          displayText = await aiRef.current.translateText(
-            result.text,
-            settings.targetLanguage
-          );
-        }
-
-        // 3. Create and store segment
-        const segment: TranscriptSegment = {
-          id: `seg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-          text: displayText,
-          timestamp: Date.now(),
-          language: result.language,
-          isQuestion: false,
-        };
-
-        segmentsRef.current = [...segmentsRef.current, segment];
-        setSegments([...segmentsRef.current]);
-        await Store.addSegment(meetingIdRef.current!, segment);
-
-        // 4. Detect question and generate answer
-        if (settings.autoAnswer && aiRef.current) {
-          const recentText = segmentsRef.current
-            .slice(-5)
-            .map(s => s.text)
-            .join(' ');
-
-          const isQuestion = await aiRef.current.detectQuestion(
-            recentText,
-            displayText
-          );
-
-          if (isQuestion) {
-            segment.isQuestion = true;
-
-            const fullTranscript = await Store.getFullTranscript(meetingIdRef.current!);
-            const answerId = `ans_${Date.now()}`;
-
-            // Initialize answer card immediately with empty text
-            setCurrentAnswer({
-              id: answerId,
-              question: displayText,
-              answer: '',
-              timestamp: Date.now(),
-              dismissed: false,
-            });
-
-            // Stream the answer progressively
-            await aiRef.current.generateAnswerStreaming(
-              fullTranscript,
-              displayText,
-              settings.meetingTopic,
-              settings.userRole,
-              (chunk) => {
-                setCurrentAnswer(prev =>
-                  prev && prev.id === answerId
-                    ? { ...prev, answer: prev.answer + chunk }
-                    : prev
-                );
-              }
-            );
-          }
+        if (useDeepgram && deepgramRef.current) {
+          await processWithDeepgram(uri, id);
+        } else if (whisperRef.current) {
+          await processWithWhisper(uri, id);
         }
       } catch (err) {
         console.error('Transcription pipeline error:', err);
       }
     });
   }, [settings, apiKeys]);
+
+  const processWithWhisper = async (uri: string, meetingId: string) => {
+    const result = await whisperRef.current!.transcribe(
+      uri,
+      settings.sourceLanguage
+    );
+
+    if (!result.text || result.text.trim().length === 0) return;
+
+    let displayText = result.text;
+    if (
+      settings.targetLanguage !== 'auto' &&
+      result.language &&
+      result.language !== settings.targetLanguage &&
+      aiRef.current
+    ) {
+      displayText = await aiRef.current.translateText(
+        result.text,
+        settings.targetLanguage
+      );
+    }
+
+    const segment: TranscriptSegment = {
+      id: `seg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      text: displayText,
+      timestamp: Date.now(),
+      language: result.language,
+      isQuestion: false,
+    };
+
+    addSegmentAndDetect(segment, meetingId, displayText);
+  };
+
+  const processWithDeepgram = async (uri: string, meetingId: string) => {
+    const result = await deepgramRef.current!.transcribeWithDiarization(
+      uri,
+      settings.sourceLanguage
+    );
+
+    if (result.segments.length === 0) return;
+
+    for (const dgSeg of result.segments) {
+      let displayText = dgSeg.text;
+
+      // Translate if needed
+      if (
+        settings.targetLanguage !== 'auto' &&
+        dgSeg.language &&
+        dgSeg.language !== settings.targetLanguage &&
+        aiRef.current
+      ) {
+        displayText = await aiRef.current.translateText(
+          dgSeg.text,
+          settings.targetLanguage
+        );
+      }
+
+      const segment: TranscriptSegment = {
+        id: `seg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        text: displayText,
+        timestamp: Date.now(),
+        language: dgSeg.language || result.language,
+        isQuestion: false,
+        speaker: resolveSpeakerName(dgSeg.speaker),
+      };
+
+      addSegmentAndDetect(segment, meetingId, displayText);
+    }
+  };
+
+  const addSegmentAndDetect = async (
+    segment: TranscriptSegment,
+    meetingId: string,
+    displayText: string
+  ) => {
+    segmentsRef.current = [...segmentsRef.current, segment];
+    setSegments([...segmentsRef.current]);
+    await Store.addSegment(meetingId, segment);
+
+    // Detect question and stream answer
+    if (settings.autoAnswer && aiRef.current) {
+      const recentText = segmentsRef.current
+        .slice(-5)
+        .map(s => s.speaker ? `${s.speaker}: ${s.text}` : s.text)
+        .join(' ');
+
+      const isQuestion = await aiRef.current.detectQuestion(
+        recentText,
+        displayText
+      );
+
+      if (isQuestion) {
+        segment.isQuestion = true;
+
+        const fullTranscript = await Store.getFullTranscript(meetingId);
+        const answerId = `ans_${Date.now()}`;
+
+        setCurrentAnswer({
+          id: answerId,
+          question: displayText,
+          answer: '',
+          timestamp: Date.now(),
+          dismissed: false,
+        });
+
+        await aiRef.current.generateAnswerStreaming(
+          fullTranscript,
+          displayText,
+          settings.meetingTopic,
+          settings.userRole,
+          (chunk) => {
+            setCurrentAnswer(prev =>
+              prev && prev.id === answerId
+                ? { ...prev, answer: prev.answer + chunk }
+                : prev
+            );
+          }
+        );
+      }
+    }
+  };
 
   const stopSession = useCallback(async () => {
     setIsLive(false);

@@ -1,11 +1,14 @@
 export type AIProvider = 'claude' | 'openai' | 'gemini';
 
+export type STTProvider = 'whisper' | 'deepgram';
+
 export interface TranscriptSegment {
   id: string;
   text: string;
   timestamp: number;
   language?: string;
   isQuestion: boolean;
+  speaker?: string;
 }
 
 export interface Meeting {
@@ -35,12 +38,14 @@ export interface AnswerSuggestion {
 
 export interface AppSettings {
   aiProvider: AIProvider;
+  sttProvider: STTProvider;
   sourceLanguage: string;
   targetLanguage: string;
   fontSize: number;
   meetingTopic: string;
   userRole: string;
   autoAnswer: boolean;
+  speakerNames: Record<string, string>; // map speaker_0 -> "John"
 }
 
 export interface AIProviderConfig {

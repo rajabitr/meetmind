@@ -1,10 +1,27 @@
 import { useRef, useEffect } from 'react';
 import { FlatList, Text, View, StyleSheet } from 'react-native';
 import { TranscriptSegment } from '../types';
+import { SPEAKER_COLORS } from '../config/constants';
 
 interface Props {
   segments: TranscriptSegment[];
   fontSize: number;
+}
+
+function getSpeakerColor(speaker?: string): string {
+  if (!speaker) return '#E0E0E0';
+  // Extract number from "Speaker 1", "Speaker 2", etc. or use hash
+  const match = speaker.match(/(\d+)/);
+  if (match) {
+    const idx = (parseInt(match[1], 10) - 1) % SPEAKER_COLORS.length;
+    return SPEAKER_COLORS[idx];
+  }
+  // Hash-based fallback for custom names
+  let hash = 0;
+  for (let i = 0; i < speaker.length; i++) {
+    hash = speaker.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return SPEAKER_COLORS[Math.abs(hash) % SPEAKER_COLORS.length];
 }
 
 export function TranscriptView({ segments, fontSize }: Props) {
@@ -30,32 +47,52 @@ export function TranscriptView({ segments, fontSize }: Props) {
     );
   }
 
+  // Check if previous segment has same speaker (to avoid repeating label)
+  const shouldShowSpeaker = (index: number): boolean => {
+    const item = segments[index];
+    if (!item.speaker) return false;
+    if (index === 0) return true;
+    return segments[index - 1].speaker !== item.speaker;
+  };
+
   return (
     <FlatList
       ref={listRef}
       data={segments}
       keyExtractor={(item) => item.id}
       contentContainerStyle={styles.listContent}
-      renderItem={({ item }) => (
-        <View style={[
-          styles.segment,
-          item.isQuestion && styles.questionSegment,
-        ]}>
-          {item.isQuestion && (
-            <Text style={styles.questionBadge}>❓ QUESTION</Text>
-          )}
-          <Text style={[
-            styles.segmentText,
-            { fontSize },
-            item.isQuestion && styles.questionText,
+      renderItem={({ item, index }) => {
+        const speakerColor = getSpeakerColor(item.speaker);
+        const showSpeaker = shouldShowSpeaker(index);
+
+        return (
+          <View style={[
+            styles.segment,
+            item.isQuestion && styles.questionSegment,
+            item.speaker && styles.speakerSegment,
+            item.speaker && { borderLeftColor: speakerColor },
           ]}>
-            {item.text}
-          </Text>
-          {item.language && (
-            <Text style={styles.langTag}>{item.language.toUpperCase()}</Text>
-          )}
-        </View>
-      )}
+            {item.isQuestion && (
+              <Text style={styles.questionBadge}>❓ QUESTION</Text>
+            )}
+            {showSpeaker && item.speaker && (
+              <Text style={[styles.speakerLabel, { color: speakerColor }]}>
+                {item.speaker}
+              </Text>
+            )}
+            <Text style={[
+              styles.segmentText,
+              { fontSize },
+              item.isQuestion && styles.questionText,
+            ]}>
+              {item.text}
+            </Text>
+            {item.language && (
+              <Text style={styles.langTag}>{item.language.toUpperCase()}</Text>
+            )}
+          </View>
+        );
+      }}
       onContentSizeChange={() => {
         listRef.current?.scrollToEnd({ animated: true });
       }}
@@ -77,6 +114,17 @@ const styles = StyleSheet.create({
   segment: {
     marginBottom: 12,
     paddingVertical: 4,
+  },
+  speakerSegment: {
+    borderLeftWidth: 3,
+    paddingLeft: 12,
+    borderRadius: 4,
+  },
+  speakerLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 2,
+    letterSpacing: 0.5,
   },
   questionSegment: {
     backgroundColor: 'rgba(255, 193, 7, 0.08)',

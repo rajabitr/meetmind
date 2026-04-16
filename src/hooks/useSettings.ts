@@ -14,7 +14,7 @@ export function useSettings() {
       if (saved) setSettings({ ...DEFAULT_SETTINGS, ...saved });
 
       const keys: Record<string, string> = {};
-      for (const provider of ['openai', 'claude', 'gemini']) {
+      for (const provider of ['openai', 'claude', 'gemini', 'deepgram']) {
         const key = await getApiKey(provider);
         if (key) keys[provider] = key;
       }

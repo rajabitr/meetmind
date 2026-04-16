@@ -23,6 +23,7 @@ export async function initDB(): Promise<void> {
       timestamp INTEGER NOT NULL,
       language TEXT,
       isQuestion INTEGER DEFAULT 0,
+      speaker TEXT,
       FOREIGN KEY (meetingId) REFERENCES meetings(id)
     );
 
@@ -54,9 +55,9 @@ export async function addSegment(
   segment: TranscriptSegment
 ): Promise<void> {
   await db.runAsync(
-    'INSERT INTO segments (id, meetingId, text, timestamp, language, isQuestion) VALUES (?, ?, ?, ?, ?, ?)',
+    'INSERT INTO segments (id, meetingId, text, timestamp, language, isQuestion, speaker) VALUES (?, ?, ?, ?, ?, ?, ?)',
     segment.id, meetingId, segment.text, segment.timestamp,
-    segment.language ?? null, segment.isQuestion ? 1 : 0
+    segment.language ?? null, segment.isQuestion ? 1 : 0, segment.speaker ?? null
   );
 }
 

@@ -21,6 +21,19 @@ export const AUDIO_CONFIG = {
 
 export const WHISPER_API_URL = 'https://api.openai.com/v1/audio/transcriptions';
 
+export const DEEPGRAM_API_URL = 'https://api.deepgram.com/v1/listen';
+
+export const SPEAKER_COLORS = [
+  '#4FC3F7', // blue
+  '#81C784', // green
+  '#FFB74D', // orange
+  '#BA68C8', // purple
+  '#F06292', // pink
+  '#4DD0E1', // cyan
+  '#AED581', // lime
+  '#FFD54F', // amber
+] as const;
+
 export const LANGUAGES = [
   { code: 'auto', label: 'Auto Detect' },
   { code: 'en', label: 'English' },
@@ -37,10 +50,12 @@ export const LANGUAGES = [
 
 export const DEFAULT_SETTINGS = {
   aiProvider: 'claude' as const,
+  sttProvider: 'whisper' as const,
   sourceLanguage: 'auto',
   targetLanguage: 'en',
   fontSize: 18,
   meetingTopic: '',
   userRole: '',
   autoAnswer: true,
+  speakerNames: {} as Record<string, string>,
 };

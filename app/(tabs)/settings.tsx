@@ -10,13 +10,18 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSettings } from '../../src/hooks/useSettings';
-import { AIProvider } from '../../src/types';
+import { AIProvider, STTProvider } from '../../src/types';
 import { LANGUAGES } from '../../src/config/constants';
 
 const AI_PROVIDERS: { value: AIProvider; label: string }[] = [
   { value: 'claude', label: 'Claude (Anthropic)' },
   { value: 'openai', label: 'OpenAI' },
   { value: 'gemini', label: 'Gemini (Google)' },
+];
+
+const STT_PROVIDERS: { value: STTProvider; label: string; desc: string }[] = [
+  { value: 'whisper', label: 'Whisper (OpenAI)', desc: 'High accuracy, no speaker detection' },
+  { value: 'deepgram', label: 'Deepgram', desc: 'Speaker diarization + transcription' },
 ];
 
 export default function SettingsScreen() {
@@ -55,10 +60,60 @@ export default function SettingsScreen() {
         ))}
       </View>
 
+      {/* STT Provider */}
+      <Text style={styles.sectionTitle}>Speech-to-Text</Text>
+      <View style={styles.card}>
+        {STT_PROVIDERS.map(p => (
+          <TouchableOpacity
+            key={p.value}
+            style={[
+              styles.providerOption,
+              settings.sttProvider === p.value && styles.providerSelected,
+            ]}
+            onPress={() => updateSettings({ sttProvider: p.value })}
+          >
+            <Text style={[
+              styles.providerText,
+              settings.sttProvider === p.value && styles.providerTextSelected,
+            ]}>
+              {p.label}
+            </Text>
+            <Text style={styles.hint}>{p.desc}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
       {/* API Keys */}
       <Text style={styles.sectionTitle}>API Keys</Text>
       <View style={styles.card}>
-        <Text style={styles.hint}>OpenAI key is always required for Whisper STT</Text>
+        <Text style={styles.hint}>
+          {settings.sttProvider === 'deepgram'
+            ? 'Deepgram key required for transcription'
+            : 'OpenAI key required for Whisper STT'}
+        </Text>
+        {settings.sttProvider === 'deepgram' && (
+          <View style={styles.keyRow}>
+            <Text style={styles.label}>Deepgram</Text>
+            <View style={styles.keyInputRow}>
+              <TextInput
+                style={styles.input}
+                value={apiKeys['deepgram'] || ''}
+                onChangeText={(val) => updateApiKey('deepgram', val)}
+                placeholder="Enter Deepgram API key"
+                placeholderTextColor="#555"
+                secureTextEntry={!showKey['deepgram']}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TouchableOpacity
+                onPress={() => setShowKey(prev => ({ ...prev, deepgram: !prev.deepgram }))}
+                style={styles.eyeBtn}
+              >
+                <Text style={styles.eyeText}>{showKey['deepgram'] ? 'Hide' : 'Show'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
         {AI_PROVIDERS.map(p => (
           <View key={p.value} style={styles.keyRow}>
             <Text style={styles.label}>{p.label}</Text>
@@ -151,6 +206,37 @@ export default function SettingsScreen() {
           placeholderTextColor="#555"
         />
       </View>
+
+      {/* Speaker Names (only when Deepgram) */}
+      {settings.sttProvider === 'deepgram' && (
+        <>
+          <Text style={styles.sectionTitle}>Speaker Names</Text>
+          <View style={styles.card}>
+            <Text style={styles.hint}>
+              Map detected speakers to real names. These appear in the transcript.
+            </Text>
+            {[1, 2, 3, 4, 5].map(num => {
+              const key = `Speaker ${num}`;
+              return (
+                <View key={key} style={styles.keyRow}>
+                  <Text style={styles.label}>{key}</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={settings.speakerNames?.[key] || ''}
+                    onChangeText={(val) => {
+                      const updated = { ...(settings.speakerNames || {}), [key]: val };
+                      if (!val) delete updated[key];
+                      updateSettings({ speakerNames: updated });
+                    }}
+                    placeholder={`Name for ${key}`}
+                    placeholderTextColor="#555"
+                  />
+                </View>
+              );
+            })}
+          </View>
+        </>
+      )}
 
       {/* Display */}
       <Text style={styles.sectionTitle}>Display</Text>
