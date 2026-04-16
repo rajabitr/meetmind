@@ -6,6 +6,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 import { initDB } from '../src/services/TranscriptStore';
+import { SettingsProvider } from '../src/hooks/useSettings';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -41,19 +42,21 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider value={DarkTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="meeting/[id]"
-          options={{
-            presentation: 'modal',
-            title: 'Meeting Details',
-            headerStyle: { backgroundColor: '#121212' },
-            headerTintColor: '#fff',
-          }}
-        />
-      </Stack>
-    </ThemeProvider>
+    <SettingsProvider>
+      <ThemeProvider value={DarkTheme}>
+        <Stack>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="meeting/[id]"
+            options={{
+              presentation: 'modal',
+              title: 'Meeting Details',
+              headerStyle: { backgroundColor: '#121212' },
+              headerTintColor: '#fff',
+            }}
+          />
+        </Stack>
+      </ThemeProvider>
+    </SettingsProvider>
   );
 }

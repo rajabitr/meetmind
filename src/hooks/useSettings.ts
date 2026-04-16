@@ -1,9 +1,20 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, createContext, useContext, ReactNode } from 'react';
+import React from 'react';
 import { AppSettings } from '../types';
 import { saveSettings, getSettings, saveApiKey, getApiKey } from '../services/SecureStorage';
 import { DEFAULT_SETTINGS } from '../config/constants';
 
-export function useSettings() {
+interface SettingsContextType {
+  settings: AppSettings;
+  apiKeys: Record<string, string>;
+  loading: boolean;
+  updateSettings: (partial: Partial<AppSettings>) => Promise<void>;
+  updateApiKey: (provider: string, key: string) => Promise<void>;
+}
+
+const SettingsContext = createContext<SettingsContextType | null>(null);
+
+export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -36,5 +47,17 @@ export function useSettings() {
     setApiKeys(prev => ({ ...prev, [provider]: key }));
   }, []);
 
-  return { settings, apiKeys, updateSettings, updateApiKey, loading };
+  return React.createElement(
+    SettingsContext.Provider,
+    { value: { settings, apiKeys, loading, updateSettings, updateApiKey } },
+    children
+  );
+}
+
+export function useSettings() {
+  const ctx = useContext(SettingsContext);
+  if (!ctx) {
+    throw new Error('useSettings must be used within SettingsProvider');
+  }
+  return ctx;
 }
