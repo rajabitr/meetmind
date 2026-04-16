@@ -119,8 +119,8 @@ export class StreamingService {
     response: Response,
     onEvent: (event: string, data: any) => void
   ): Promise<string> {
-    const reader = response.body?.getReader();
-    if (!reader) throw new Error('No response body');
+    const reader = response.body?.getReader?.();
+    if (!reader) throw new Error('Streaming not supported in this environment');
 
     const decoder = new TextDecoder();
     let fullText = '';

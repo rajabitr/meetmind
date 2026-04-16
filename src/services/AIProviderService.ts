@@ -72,8 +72,18 @@ Question asked: ${question}
 
 Generate a clear, professional answer with specific details when possible. Keep it concise but thorough (2-4 sentences). Do NOT prefix with "Answer:" or similar.`;
 
-    const model = this.config.smartModel;
-    return this.streaming.streamAnswer(prompt, model, onChunk);
+    // React Native doesn't support ReadableStream for SSE,
+    // so fall back to non-streaming and deliver result at once
+    try {
+      const model = this.config.smartModel;
+      const result = await this.streaming.streamAnswer(prompt, model, onChunk);
+      return result;
+    } catch {
+      // Fallback: non-streaming
+      const response = await this.callAI(prompt, 'smart');
+      onChunk(response.content);
+      return response.content;
+    }
   }
 
   async generateSummary(fullTranscript: string): Promise<string> {
