@@ -15,9 +15,11 @@
     },
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.meetmind.app",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "MeetMind needs microphone access to transcribe meeting audio in real-time.",
-        "NSSpeechRecognitionUsageDescription": "MeetMind uses speech recognition to convert audio to text."
+        "NSSpeechRecognitionUsageDescription": "MeetMind uses speech recognition to convert audio to text.",
+        "UIBackgroundModes": ["audio"]
       }
     },
     "android": {
@@ -25,6 +27,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000000"
       },
+      "package": "com.meetmind.app",
       "permissions": ["RECORD_AUDIO"],
       "edgeToEdgeEnabled": true
     },
