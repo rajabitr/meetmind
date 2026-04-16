@@ -58,4 +58,6 @@ export const DEFAULT_SETTINGS = {
   userRole: '',
   autoAnswer: true,
   speakerNames: {} as Record<string, string>,
+  voiceCalibrationText: '',
+  filterOwnVoice: true,
 };

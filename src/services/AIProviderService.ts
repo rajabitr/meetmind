@@ -15,6 +15,24 @@ export class AIProviderService {
     this.streaming = new StreamingService(config);
   }
 
+  async isUserSpeaking(
+    newText: string,
+    userVoiceSample: string
+  ): Promise<boolean> {
+    const prompt = `You are comparing speech patterns. I have a voice calibration sample from the USER, and a new transcript chunk. Determine if the new chunk is spoken by the SAME person as the sample.
+
+User's voice sample: "${userVoiceSample}"
+
+New transcript: "${newText}"
+
+Consider speech patterns, vocabulary, speaking style, and context. The user is typically the one ANSWERING questions or saying short responses like "yes", "sure", "can you repeat that?", "I think...", etc.
+
+Answer ONLY "SAME" if it's likely the same person, or "DIFFERENT" if it's likely someone else speaking.`;
+
+    const response = await this.callAI(prompt, 'fast');
+    return response.content.trim().toUpperCase().includes('SAME');
+  }
+
   async detectQuestion(
     recentTranscript: string,
     lastSegment: string

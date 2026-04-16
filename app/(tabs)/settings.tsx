@@ -12,6 +12,7 @@ import {
 import { useSettings } from '../../src/hooks/useSettings';
 import { AIProvider, STTProvider } from '../../src/types';
 import { LANGUAGES } from '../../src/config/constants';
+import { VoiceCalibration } from '../../src/components/VoiceCalibration';
 
 const AI_PROVIDERS: { value: AIProvider; label: string }[] = [
   { value: 'claude', label: 'Claude (Anthropic)' },
@@ -237,6 +238,35 @@ export default function SettingsScreen() {
           </View>
         </>
       )}
+
+      {/* Voice Filter */}
+      <Text style={styles.sectionTitle}>Voice Filter</Text>
+      <View style={styles.card}>
+        <View style={styles.switchRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.label}>Filter My Voice</Text>
+            <Text style={styles.hint}>
+              Ignore your own speech — only detect and answer questions from others
+            </Text>
+          </View>
+          <Switch
+            value={settings.filterOwnVoice}
+            onValueChange={(val) => updateSettings({ filterOwnVoice: val })}
+            trackColor={{ false: '#333', true: '#4FC3F7' }}
+            thumbColor="#fff"
+          />
+        </View>
+
+        {settings.filterOwnVoice && (
+          <View style={{ marginTop: 16 }}>
+            <VoiceCalibration
+              currentText={settings.voiceCalibrationText}
+              openaiKey={apiKeys['openai'] || ''}
+              onCalibrated={(text) => updateSettings({ voiceCalibrationText: text })}
+            />
+          </View>
+        )}
+      </View>
 
       {/* Display */}
       <Text style={styles.sectionTitle}>Display</Text>

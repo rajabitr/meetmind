@@ -45,7 +45,9 @@ export interface AppSettings {
   meetingTopic: string;
   userRole: string;
   autoAnswer: boolean;
-  speakerNames: Record<string, string>; // map speaker_0 -> "John"
+  speakerNames: Record<string, string>;
+  voiceCalibrationText: string; // sample of user's speech pattern
+  filterOwnVoice: boolean;
 }
 
 export interface AIProviderConfig {

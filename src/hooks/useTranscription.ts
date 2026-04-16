@@ -179,6 +179,31 @@ export function useTranscription(settings: AppSettings, apiKeys: Record<string, 
     meetingId: string,
     displayText: string
   ) => {
+    // Filter own voice if calibrated
+    if (
+      settings.filterOwnVoice &&
+      settings.voiceCalibrationText &&
+      aiRef.current
+    ) {
+      try {
+        const isMe = await aiRef.current.isUserSpeaking(
+          displayText,
+          settings.voiceCalibrationText
+        );
+        if (isMe) {
+          // Still save segment but mark as user's own speech
+          segment.speaker = 'You';
+          segmentsRef.current = [...segmentsRef.current, segment];
+          setSegments([...segmentsRef.current]);
+          await Store.addSegment(meetingId, segment);
+          setStatus('(Your speech — skipping detection)');
+          return; // Don't detect questions in own speech
+        }
+      } catch {
+        // On error, continue normally
+      }
+    }
+
     segmentsRef.current = [...segmentsRef.current, segment];
     setSegments([...segmentsRef.current]);
     await Store.addSegment(meetingId, segment);
