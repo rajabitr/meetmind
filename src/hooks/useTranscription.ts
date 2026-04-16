@@ -119,20 +119,31 @@ export function useTranscription(settings: AppSettings, apiKeys: Record<string, 
             segment.isQuestion = true;
 
             const fullTranscript = await Store.getFullTranscript(meetingIdRef.current!);
-            const answer = await aiRef.current.generateAnswer(
-              fullTranscript,
-              displayText,
-              settings.meetingTopic,
-              settings.userRole
-            );
+            const answerId = `ans_${Date.now()}`;
 
+            // Initialize answer card immediately with empty text
             setCurrentAnswer({
-              id: `ans_${Date.now()}`,
+              id: answerId,
               question: displayText,
-              answer,
+              answer: '',
               timestamp: Date.now(),
               dismissed: false,
             });
+
+            // Stream the answer progressively
+            await aiRef.current.generateAnswerStreaming(
+              fullTranscript,
+              displayText,
+              settings.meetingTopic,
+              settings.userRole,
+              (chunk) => {
+                setCurrentAnswer(prev =>
+                  prev && prev.id === answerId
+                    ? { ...prev, answer: prev.answer + chunk }
+                    : prev
+                );
+              }
+            );
           }
         }
       } catch (err) {

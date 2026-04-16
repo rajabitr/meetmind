@@ -58,11 +58,19 @@ export function AnswerCard({ answer, fontSize, onDismiss }: Props) {
       <View style={styles.divider} />
 
       <Text style={[styles.answerText, { fontSize: fontSize + 2 }]}>
-        {answer.answer}
+        {answer.answer || ''}
+        {answer.answer.length === 0 && (
+          <Text style={styles.typingIndicator}>Thinking...</Text>
+        )}
+        {answer.answer.length > 0 && answer.answer.length < 20 && (
+          <Text style={styles.typingCursor}>|</Text>
+        )}
       </Text>
 
       <TouchableOpacity onPress={onDismiss} style={styles.gotItBtn}>
-        <Text style={styles.gotItText}>Got it</Text>
+        <Text style={styles.gotItText}>
+          {answer.answer.length === 0 ? '...' : 'Got it'}
+        </Text>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -132,5 +140,14 @@ const styles = StyleSheet.create({
     color: '#69F0AE',
     fontWeight: '600',
     fontSize: 14,
+  },
+  typingIndicator: {
+    color: '#4CAF50',
+    fontStyle: 'italic',
+    fontSize: 14,
+  },
+  typingCursor: {
+    color: '#69F0AE',
+    fontWeight: '300',
   },
 });

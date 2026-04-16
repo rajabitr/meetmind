@@ -1,5 +1,6 @@
 import { AIProviderConfig } from '../types';
 import { AI_MODELS } from '../config/constants';
+import { StreamingService } from './StreamingService';
 
 interface AIResponse {
   content: string;
@@ -7,9 +8,11 @@ interface AIResponse {
 
 export class AIProviderService {
   private config: AIProviderConfig;
+  private streaming: StreamingService;
 
   constructor(config: AIProviderConfig) {
     this.config = config;
+    this.streaming = new StreamingService(config);
   }
 
   async detectQuestion(
@@ -48,6 +51,29 @@ Generate a clear, professional answer with specific details when possible. Keep 
 
     const response = await this.callAI(prompt, 'smart');
     return response.content;
+  }
+
+  async generateAnswerStreaming(
+    fullTranscript: string,
+    question: string,
+    topic: string,
+    userRole: string,
+    onChunk: (text: string) => void
+  ): Promise<string> {
+    const prompt = `You are helping someone in a meeting. Based on the meeting transcript, generate a professional, detailed answer to the question being asked.
+
+Meeting topic: ${topic || 'General meeting'}
+Your role: ${userRole || 'Team member'}
+
+Full transcript so far:
+${fullTranscript}
+
+Question asked: ${question}
+
+Generate a clear, professional answer with specific details when possible. Keep it concise but thorough (2-4 sentences). Do NOT prefix with "Answer:" or similar.`;
+
+    const model = this.config.smartModel;
+    return this.streaming.streamAnswer(prompt, model, onChunk);
   }
 
   async generateSummary(fullTranscript: string): Promise<string> {
