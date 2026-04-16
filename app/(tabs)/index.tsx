@@ -1,4 +1,4 @@
-import { View, StyleSheet, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, StatusBar } from 'react-native';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useTranscription } from '../../src/hooks/useTranscription';
 import { useSettings } from '../../src/hooks/useSettings';
@@ -13,6 +13,7 @@ export default function LiveScreen() {
     currentAnswer,
     isLive,
     error,
+    status,
     startSession,
     stopSession,
     dismissAnswer,
@@ -24,6 +25,13 @@ export default function LiveScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" hidden={isLive} />
+
+      {/* Debug status bar */}
+      {isLive && status ? (
+        <View style={styles.statusBar}>
+          <Text style={styles.statusText}>{status}</Text>
+        </View>
+      ) : null}
 
       <TranscriptView
         segments={segments}
@@ -52,5 +60,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0a0a0a',
+  },
+  statusBar: {
+    backgroundColor: '#1a2a1a',
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+  },
+  statusText: {
+    color: '#4FC3F7',
+    fontSize: 11,
+    textAlign: 'center',
   },
 });

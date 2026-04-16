@@ -12,6 +12,7 @@ export function useTranscription(settings: AppSettings, apiKeys: Record<string, 
   const [currentAnswer, setCurrentAnswer] = useState<AnswerSuggestion | null>(null);
   const [isLive, setIsLive] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<string>('');
   const [meetingId, setMeetingId] = useState<string | null>(null);
 
   const audioService = useRef(new AudioCaptureService());
@@ -83,16 +84,21 @@ export function useTranscription(settings: AppSettings, apiKeys: Record<string, 
 
     setIsLive(true);
 
+    let chunkCount = 0;
     await audioService.current.startCapture(async (uri) => {
+      chunkCount++;
+      setStatus(`Chunk #${chunkCount} captured, sending to API...`);
       try {
         if (useDeepgram && deepgramRef.current) {
           await processWithDeepgram(uri, id);
         } else if (whisperRef.current) {
+          setStatus(`Chunk #${chunkCount} sending to Whisper...`);
           await processWithWhisper(uri, id);
+          setStatus(`Chunk #${chunkCount} done!`);
         }
       } catch (err: any) {
         const msg = err?.message || String(err);
-        console.error('Transcription pipeline error:', msg);
+        setStatus(`Error on chunk #${chunkCount}: ${msg}`);
         setError(msg);
       }
     });
@@ -248,6 +254,7 @@ export function useTranscription(settings: AppSettings, apiKeys: Record<string, 
     currentAnswer,
     isLive,
     error,
+    status,
     meetingId,
     startSession,
     stopSession,
