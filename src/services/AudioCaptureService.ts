@@ -4,6 +4,7 @@ import { AUDIO_CONFIG } from '../config/constants';
 export class AudioCaptureService {
   private recording: Audio.Recording | null = null;
   private isRecording = false;
+  private rotating = false;
   private onChunkReady: ((uri: string) => void) | null = null;
   private chunkInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -24,7 +25,9 @@ export class AudioCaptureService {
     await this.recordChunk();
 
     this.chunkInterval = setInterval(() => {
-      if (this.isRecording) this.rotateRecording();
+      if (this.isRecording && !this.rotating) {
+        this.rotateRecording();
+      }
     }, AUDIO_CONFIG.CHUNK_DURATION_MS);
   }
 
@@ -36,19 +39,36 @@ export class AudioCaptureService {
   }
 
   private async rotateRecording(): Promise<void> {
-    if (!this.recording) return;
+    if (!this.recording || this.rotating) return;
+    this.rotating = true;
 
-    const prevRecording = this.recording;
-    this.recording = null;
+    try {
+      const prevRecording = this.recording;
+      this.recording = null;
 
-    // Start new recording immediately to minimize gap
-    await this.recordChunk();
+      // MUST stop previous before starting new (iOS only allows one)
+      await prevRecording.stopAndUnloadAsync();
+      const uri = prevRecording.getURI();
 
-    // Process previous chunk
-    await prevRecording.stopAndUnloadAsync();
-    const uri = prevRecording.getURI();
-    if (uri && this.onChunkReady) {
-      this.onChunkReady(uri);
+      // Start new recording after previous is fully stopped
+      if (this.isRecording) {
+        await this.recordChunk();
+      }
+
+      // Process previous chunk in background
+      if (uri && this.onChunkReady) {
+        this.onChunkReady(uri);
+      }
+    } catch (err) {
+      console.error('Rotate recording error:', err);
+      // Try to recover by starting a fresh recording
+      if (this.isRecording && !this.recording) {
+        try {
+          await this.recordChunk();
+        } catch {}
+      }
+    } finally {
+      this.rotating = false;
     }
   }
 
@@ -61,10 +81,14 @@ export class AudioCaptureService {
     }
 
     if (this.recording) {
-      await this.recording.stopAndUnloadAsync();
-      const uri = this.recording.getURI();
-      if (uri && this.onChunkReady) {
-        this.onChunkReady(uri);
+      try {
+        await this.recording.stopAndUnloadAsync();
+        const uri = this.recording.getURI();
+        if (uri && this.onChunkReady) {
+          this.onChunkReady(uri);
+        }
+      } catch (err) {
+        console.error('Stop recording error:', err);
       }
       this.recording = null;
     }
