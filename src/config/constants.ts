@@ -14,7 +14,7 @@ export const AI_MODELS = {
 } as const;
 
 export const AUDIO_CONFIG = {
-  CHUNK_DURATION_MS: 4000,
+  CHUNK_DURATION_MS: 2500,
   SAMPLE_RATE: 16000,
   CHANNELS: 1,
 } as const;

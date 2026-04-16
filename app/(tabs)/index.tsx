@@ -11,6 +11,7 @@ export default function LiveScreen() {
   const {
     segments,
     currentAnswer,
+    answerCount,
     isLive,
     error,
     status,
@@ -42,7 +43,8 @@ export default function LiveScreen() {
         <AnswerCard
           answer={currentAnswer}
           fontSize={settings.fontSize}
-          onDismiss={dismissAnswer}
+          onDismiss={() => dismissAnswer(currentAnswer.id)}
+          queueCount={answerCount}
         />
       )}
 

@@ -13,9 +13,10 @@ interface Props {
   answer: AnswerSuggestion;
   fontSize: number;
   onDismiss: () => void;
+  queueCount?: number;
 }
 
-export function AnswerCard({ answer, fontSize, onDismiss }: Props) {
+export function AnswerCard({ answer, fontSize, onDismiss, queueCount = 0 }: Props) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
 
@@ -47,7 +48,9 @@ export function AnswerCard({ answer, fontSize, onDismiss }: Props) {
       ]}
     >
       <View style={styles.header}>
-        <Text style={styles.badge}>💡 SUGGESTED ANSWER</Text>
+        <Text style={styles.badge}>
+          💡 SUGGESTED ANSWER{queueCount > 1 ? ` (${queueCount} more)` : ''}
+        </Text>
         <TouchableOpacity onPress={onDismiss} style={styles.dismissBtn}>
           <Text style={styles.dismissText}>✕</Text>
         </TouchableOpacity>
@@ -69,7 +72,7 @@ export function AnswerCard({ answer, fontSize, onDismiss }: Props) {
 
       <TouchableOpacity onPress={onDismiss} style={styles.gotItBtn}>
         <Text style={styles.gotItText}>
-          {answer.answer.length === 0 ? '...' : 'Got it'}
+          {answer.answer.length === 0 ? '...' : queueCount > 1 ? 'Next →' : 'Got it'}
         </Text>
       </TouchableOpacity>
     </Animated.View>

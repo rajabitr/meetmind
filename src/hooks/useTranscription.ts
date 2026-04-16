@@ -9,7 +9,7 @@ import { AI_MODELS } from '../config/constants';
 
 export function useTranscription(settings: AppSettings, apiKeys: Record<string, string>) {
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
-  const [currentAnswer, setCurrentAnswer] = useState<AnswerSuggestion | null>(null);
+  const [answerQueue, setAnswerQueue] = useState<AnswerSuggestion[]>([]);
   const [isLive, setIsLive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string>('');
@@ -31,7 +31,6 @@ export function useTranscription(settings: AppSettings, apiKeys: Record<string, 
 
     const useDeepgram = settings.sttProvider === 'deepgram';
 
-    // Validate API keys
     if (useDeepgram) {
       const dgKey = apiKeys['deepgram'];
       if (!dgKey) {
@@ -68,6 +67,7 @@ export function useTranscription(settings: AppSettings, apiKeys: Record<string, 
     meetingIdRef.current = id;
     segmentsRef.current = [];
     setSegments([]);
+    setAnswerQueue([]);
 
     await Store.createMeeting(
       id,
@@ -85,22 +85,24 @@ export function useTranscription(settings: AppSettings, apiKeys: Record<string, 
     setIsLive(true);
 
     let chunkCount = 0;
-    await audioService.current.startCapture(async (uri) => {
+    await audioService.current.startCapture((uri) => {
+      // NON-BLOCKING: don't await, let chunks process in parallel
       chunkCount++;
-      setStatus(`Chunk #${chunkCount} captured, sending to API...`);
-      try {
-        if (useDeepgram && deepgramRef.current) {
-          await processWithDeepgram(uri, id);
-        } else if (whisperRef.current) {
-          setStatus(`Chunk #${chunkCount} sending to Whisper...`);
-          await processWithWhisper(uri, id);
-          setStatus(`Chunk #${chunkCount} done!`);
+      const n = chunkCount;
+      setStatus(`Chunk #${n} captured`);
+
+      (async () => {
+        try {
+          if (useDeepgram && deepgramRef.current) {
+            await processWithDeepgram(uri, id);
+          } else if (whisperRef.current) {
+            await processWithWhisper(uri, id);
+          }
+        } catch (err: any) {
+          const msg = err?.message || String(err);
+          setStatus(`Error #${n}: ${msg}`);
         }
-      } catch (err: any) {
-        const msg = err?.message || String(err);
-        setStatus(`Error on chunk #${chunkCount}: ${msg}`);
-        setError(msg);
-      }
+      })();
     });
   }, [settings, apiKeys]);
 
@@ -133,7 +135,7 @@ export function useTranscription(settings: AppSettings, apiKeys: Record<string, 
       isQuestion: false,
     };
 
-    addSegmentAndDetect(segment, meetingId, displayText);
+    await addSegmentAndDetect(segment, meetingId, displayText);
   };
 
   const processWithDeepgram = async (uri: string, meetingId: string) => {
@@ -147,7 +149,6 @@ export function useTranscription(settings: AppSettings, apiKeys: Record<string, 
     for (const dgSeg of result.segments) {
       let displayText = dgSeg.text;
 
-      // Translate if needed
       if (
         settings.targetLanguage !== 'auto' &&
         dgSeg.language &&
@@ -169,7 +170,7 @@ export function useTranscription(settings: AppSettings, apiKeys: Record<string, 
         speaker: resolveSpeakerName(dgSeg.speaker),
       };
 
-      addSegmentAndDetect(segment, meetingId, displayText);
+      await addSegmentAndDetect(segment, meetingId, displayText);
     }
   };
 
@@ -182,8 +183,6 @@ export function useTranscription(settings: AppSettings, apiKeys: Record<string, 
     setSegments([...segmentsRef.current]);
     await Store.addSegment(meetingId, segment);
 
-    // Detect question and stream answer
-    setStatus(`Checking for question... (autoAnswer=${settings.autoAnswer}, ai=${!!aiRef.current})`);
     if (settings.autoAnswer && aiRef.current) {
       const recentText = segmentsRef.current
         .slice(-5)
@@ -195,41 +194,49 @@ export function useTranscription(settings: AppSettings, apiKeys: Record<string, 
           recentText,
           displayText
         );
-        setStatus(`Question detected: ${isQuestion ? 'YES' : 'NO'} — "${displayText.slice(0, 40)}"`);
+        setStatus(isQuestion ? `Question: "${displayText.slice(0, 30)}..."` : '');
 
-      if (isQuestion) {
-        segment.isQuestion = true;
+        if (isQuestion) {
+          segment.isQuestion = true;
 
-        const fullTranscript = await Store.getFullTranscript(meetingId);
-        const answerId = `ans_${Date.now()}`;
+          const fullTranscript = await Store.getFullTranscript(meetingId);
+          const answerId = `ans_${Date.now()}`;
 
-        setCurrentAnswer({
-          id: answerId,
-          question: displayText,
-          answer: '',
-          timestamp: Date.now(),
-          dismissed: false,
-        });
+          const newAnswer: AnswerSuggestion = {
+            id: answerId,
+            question: displayText,
+            answer: '',
+            timestamp: Date.now(),
+            dismissed: false,
+          };
 
-        await aiRef.current.generateAnswerStreaming(
-          fullTranscript,
-          displayText,
-          settings.meetingTopic,
-          settings.userRole,
-          (chunk) => {
-            setCurrentAnswer(prev =>
-              prev && prev.id === answerId
-                ? { ...prev, answer: prev.answer + chunk }
-                : prev
-            );
-          }
-        );
-      }
+          // Add to queue (support multiple answers)
+          setAnswerQueue(prev => [...prev, newAnswer]);
+
+          const finalAnswer = await aiRef.current!.generateAnswerStreaming(
+            fullTranscript,
+            displayText,
+            settings.meetingTopic,
+            settings.userRole,
+            (chunk) => {
+              setAnswerQueue(prev =>
+                prev.map(a =>
+                  a.id === answerId ? { ...a, answer: a.answer + chunk } : a
+                )
+              );
+            }
+          );
+
+          // Update with final answer
+          setAnswerQueue(prev =>
+            prev.map(a =>
+              a.id === answerId ? { ...a, answer: finalAnswer || a.answer } : a
+            )
+          );
+        }
       } catch (err: any) {
-        setStatus(`Question detection error: ${err?.message || err}`);
+        setStatus(`Detection error: ${err?.message || err}`);
       }
-    } else {
-      setStatus(`Skipping question detect: autoAnswer=${settings.autoAnswer}, ai=${!!aiRef.current}`);
     }
   };
 
@@ -253,13 +260,22 @@ export function useTranscription(settings: AppSettings, apiKeys: Record<string, 
     }
   }, []);
 
-  const dismissAnswer = useCallback(() => {
-    setCurrentAnswer(null);
+  const dismissAnswer = useCallback((answerId?: string) => {
+    if (answerId) {
+      setAnswerQueue(prev => prev.filter(a => a.id !== answerId));
+    } else {
+      // Dismiss top answer
+      setAnswerQueue(prev => prev.slice(1));
+    }
   }, []);
+
+  // Current answer = first non-dismissed in queue
+  const currentAnswer = answerQueue.length > 0 ? answerQueue[0] : null;
 
   return {
     segments,
     currentAnswer,
+    answerCount: answerQueue.length,
     isLive,
     error,
     status,
