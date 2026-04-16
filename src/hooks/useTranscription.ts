@@ -90,8 +90,10 @@ export function useTranscription(settings: AppSettings, apiKeys: Record<string, 
         } else if (whisperRef.current) {
           await processWithWhisper(uri, id);
         }
-      } catch (err) {
-        console.error('Transcription pipeline error:', err);
+      } catch (err: any) {
+        const msg = err?.message || String(err);
+        console.error('Transcription pipeline error:', msg);
+        setError(msg);
       }
     });
   }, [settings, apiKeys]);
