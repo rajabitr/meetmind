@@ -14,9 +14,11 @@ export const AI_MODELS = {
 } as const;
 
 export const AUDIO_CONFIG = {
-  CHUNK_DURATION_MS: 2500,
+  CHUNK_DURATION_MS: 3000,
   SAMPLE_RATE: 16000,
   CHANNELS: 1,
+  // Only run question detection every N chunks (saves API calls)
+  DETECTION_INTERVAL: 2,
 } as const;
 
 export const WHISPER_API_URL = 'https://api.openai.com/v1/audio/transcriptions';
