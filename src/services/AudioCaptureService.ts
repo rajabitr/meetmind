@@ -1,12 +1,16 @@
 import { Audio } from 'expo-av';
 import { AUDIO_CONFIG } from '../config/constants';
 
+// Silence threshold in dBFS (-160 is complete silence, -30 is quiet speech)
+const SILENCE_THRESHOLD = -45;
+
 export class AudioCaptureService {
   private recording: Audio.Recording | null = null;
   private isRecording = false;
   private rotating = false;
   private onChunkReady: ((uri: string) => void) | null = null;
   private chunkInterval: ReturnType<typeof setInterval> | null = null;
+  private peakMeter = -160;
 
   async requestPermission(): Promise<boolean> {
     const { granted } = await Audio.requestPermissionsAsync();
@@ -33,9 +37,23 @@ export class AudioCaptureService {
 
   private async recordChunk(): Promise<void> {
     const { recording } = await Audio.Recording.createAsync(
-      Audio.RecordingOptionsPresets.HIGH_QUALITY
+      {
+        ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
+        isMeteringEnabled: true,
+      }
     );
     this.recording = recording;
+    this.peakMeter = -160;
+
+    // Poll metering during recording to track peak level
+    recording.setOnRecordingStatusUpdate((status) => {
+      if (status.isRecording && status.metering !== undefined) {
+        if (status.metering > this.peakMeter) {
+          this.peakMeter = status.metering;
+        }
+      }
+    });
+    recording.setProgressUpdateInterval(500);
   }
 
   private async rotateRecording(): Promise<void> {
@@ -44,6 +62,7 @@ export class AudioCaptureService {
 
     try {
       const prevRecording = this.recording;
+      const wasSilent = this.peakMeter < SILENCE_THRESHOLD;
       this.recording = null;
 
       // MUST stop previous before starting new (iOS only allows one)
@@ -55,13 +74,12 @@ export class AudioCaptureService {
         await this.recordChunk();
       }
 
-      // Process previous chunk in background
-      if (uri && this.onChunkReady) {
+      // Only send chunk if there was actual audio (not silence)
+      if (uri && this.onChunkReady && !wasSilent) {
         this.onChunkReady(uri);
       }
     } catch (err) {
       console.error('Rotate recording error:', err);
-      // Try to recover by starting a fresh recording
       if (this.isRecording && !this.recording) {
         try {
           await this.recordChunk();
@@ -82,9 +100,10 @@ export class AudioCaptureService {
 
     if (this.recording) {
       try {
+        const wasSilent = this.peakMeter < SILENCE_THRESHOLD;
         await this.recording.stopAndUnloadAsync();
         const uri = this.recording.getURI();
-        if (uri && this.onChunkReady) {
+        if (uri && this.onChunkReady && !wasSilent) {
           this.onChunkReady(uri);
         }
       } catch (err) {
