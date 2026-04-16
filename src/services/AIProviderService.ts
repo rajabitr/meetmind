@@ -75,7 +75,17 @@ ${fullTranscript}
 
 Question asked: ${question}
 
-Generate a clear, professional answer with specific details when possible. Keep it concise but thorough (2-4 sentences). Do NOT prefix with "Answer:" or similar.`;
+Write the answer exactly as a real person would SAY it in a conversation — not how they'd write it.
+
+Rules:
+- Use casual, natural spoken language. Say "Yeah, so basically..." not "Indeed, the approach involves..."
+- Use contractions: "we've", "it's", "don't", "I'd" — never "we have", "it is", "do not"
+- Start with natural conversation starters: "So...", "Yeah, so...", "Right, so...", "Honestly...", "Good question — "
+- Use filler words sparingly but naturally: "basically", "actually", "kind of", "you know"
+- Avoid fancy/academic words. Say "use" not "utilize", "help" not "facilitate", "get" not "obtain"
+- Keep it 2-3 sentences. Nobody gives a speech in a meeting.
+- Sound confident but not robotic. Like you're talking to a colleague, not writing an essay.
+- Do NOT prefix with "Answer:" or any label.`;
 
     const response = await this.callAI(prompt, 'smart');
     return response.content;
@@ -98,7 +108,17 @@ ${fullTranscript}
 
 Question asked: ${question}
 
-Generate a clear, professional answer with specific details when possible. Keep it concise but thorough (2-4 sentences). Do NOT prefix with "Answer:" or similar.`;
+Write the answer exactly as a real person would SAY it in a conversation — not how they'd write it.
+
+Rules:
+- Use casual, natural spoken language. Say "Yeah, so basically..." not "Indeed, the approach involves..."
+- Use contractions: "we've", "it's", "don't", "I'd" — never "we have", "it is", "do not"
+- Start with natural conversation starters: "So...", "Yeah, so...", "Right, so...", "Honestly...", "Good question — "
+- Use filler words sparingly but naturally: "basically", "actually", "kind of", "you know"
+- Avoid fancy/academic words. Say "use" not "utilize", "help" not "facilitate", "get" not "obtain"
+- Keep it 2-3 sentences. Nobody gives a speech in a meeting.
+- Sound confident but not robotic. Like you're talking to a colleague, not writing an essay.
+- Do NOT prefix with "Answer:" or any label.`;
 
     // React Native doesn't support ReadableStream for SSE,
     // so fall back to non-streaming and deliver result at once
